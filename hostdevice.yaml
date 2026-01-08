@@ -1,0 +1,376 @@
+#
+# This virtual device uses the ESPHome host device platform with the SDL2 graphics platform
+# The host platform is documented at "https://esphome.io/components/host/"
+# to install SDL2 on Linux, use "apt install libsdl2-dev libsodium-dev build-essential git"
+# as per documentation at "https://esphome.io/components/display/sdl/"
+# There is also an SDL binary sensor, the "a" and "b" keys work
+# as per documentation at "https://esphome.io/components/binary_sensor/sdl/"
+# note you must use "host: mac_address" not "wifi"
+# note you must use "platform: host" time platform, not "platform: homeassistant" time 
+#
+# To compile and run the virtual device,
+# open a terminal window...
+# open a virtual env: machine_id:~$ source venv/bin/activate
+# and compile and run your hostdevice with: machine_id:~$ esphome run /home/<your path to config>/hostdevice.yaml
+# note that "INSTALL" on the ESPHome Dashboard will not work...
+
+substitutions:
+  nodename: "hostdevice"
+
+globals:
+  - id: rad
+    type: float
+    initial_value: 'std::numbers::pi / 180'
+
+packages:
+  astro: !include 
+    file: common/astro.yaml
+    vars:
+      entity_prefix: "astro_"
+
+script:
+  - id: annotate
+    # Uses sin and cos to position Sun and Moon icons on a circular azimuth 
+    then:
+      - number.set:
+          id: annotation_moon_x
+          value: !lambda |-
+            float moon_az_deg = id(astro_moon_az).state / id(rad) + 90;
+            float moon_x = 54 * cos(moon_az_deg * std::numbers::pi/180) + 54;
+            ESP_LOGI("hostdevice", "Moon X: %0.2f pix", moon_x);
+            return int(moon_x);
+      - number.set:
+          id: annotation_moon_y
+          value: !lambda |-
+            float moon_az_deg = id(astro_moon_az).state / id(rad) + 90;
+            float moon_y = 54 * sin(moon_az_deg * std::numbers::pi/180) + 54;
+            ESP_LOGI("hostdevice", "Moon Y: %0.2f pix", moon_y);
+            return int(moon_y);
+      - lambda: |-      
+          // print the moon annotation icon on the display
+          int moon_age_int = int(id(astro_moonage).state);
+          ESP_LOGI("hostdevice", "Moon icon: %s   hex", moon_icon(moon_age_int));
+          id(my_display).print(id(annotation_moon_x).state, id(annotation_moon_y).state, id(icons), my_blue, TextAlign::CENTER, moon_icon(moon_age_int));
+      - number.set:
+          id: annotation_sun_x
+          value: !lambda |-
+            float sun_az_deg = id(astro_sun_az).state / id(rad) + 90;
+            float sun_x = 55 * cos(sun_az_deg * std::numbers::pi/180) + 61;
+            ESP_LOGI("hostdevice", "Sun X: %0.2f pix", sun_x);
+            return int(sun_x); 
+      - number.set:
+          id: annotation_sun_y
+          value: !lambda |-
+            float sun_az_deg = id(astro_sun_az).state / id(rad) + 90;
+            float sun_y = 55 * sin(sun_az_deg * std::numbers::pi/180) + 61;
+            ESP_LOGI("hostdevice", "Sun Y: %0.2f pix", sun_y);
+            return int(sun_y);
+      - lambda: |-      
+          // print the sun annotation on the display
+          id(my_display).filled_circle(id(annotation_sun_x).state, id(annotation_sun_y).state, 12, my_red);
+
+esphome:
+  name: hostdevice
+  friendly_name: hostdevice
+  on_boot:
+    priority: 600 # sensors set up
+    then:
+      - logger.log:
+          format: "Node initialized"
+          level: INFO
+      - display.page.show: page1
+
+host:
+  mac_address: "06:35:69:ab:f6:79"
+  
+# Enable Home Assistant API
+api:
+  encryption:
+    key: "moDouxFyteD7+iJiIM89mS1WakB3ooqrfkdPw66o/YU="
+  reboot_timeout: 0s
+    
+logger:
+  level: INFO
+
+number:
+  - platform: template
+    name: Moon X
+    id: annotation_moon_x
+    unit_of_measurement: "pixels"
+    min_value: 0
+    max_value: 128
+    step: 1
+    optimistic: True
+    internal: True
+    mode: box
+
+  - platform: template
+    name: Moon Y
+    id: annotation_moon_y
+    unit_of_measurement: "pixels"
+    min_value: 0
+    max_value: 128
+    step: 1
+    optimistic: True
+    internal: True
+    mode: box
+
+  - platform: template
+    name: Sun X
+    id: annotation_sun_x
+    unit_of_measurement: "pixels"
+    min_value: 0
+    max_value: 128
+    step: 1
+    optimistic: True
+    internal: True
+    mode: box
+
+  - platform: template
+    name: Sun Y
+    id: annotation_sun_y
+    unit_of_measurement: "pixels"
+    min_value: 0
+    max_value: 128
+    step: 1
+    optimistic: True
+    internal: True
+    mode: box
+
+text_sensor:
+  - platform: uptime
+    name: Uptime
+    id: my_uptime
+    update_interval: 1 min
+    internal: True
+
+# don't use the keys for now; they cause the sdl window to hang
+binary_sensor:
+#   - platform: sdl
+#     id: key_a_id
+#     key: SDLK_a
+#     on_state:
+#         - display.page.show: page1
+#         - component.update: my_display
+
+#   - platform: sdl
+#     id: key_b_id
+#     key: SDLK_b
+#     on_state:
+#         - display.page.show: page2
+#         - component.update: my_display
+
+
+  - platform: template
+    name: "Moon Up"
+    id: moon_up
+    internal: True
+    lambda: |-
+      if (id(astro_moon_alt).state > 0) {
+        // Moon is Up
+        return true;
+      } else {
+        // Moon is Down
+        return false;
+      }
+
+# image
+image:
+  - id: my_image
+    file: "./common/Moon14small.jpg"
+    type: BINARY
+    resize: 126x126
+
+font:
+  # some fonts for the display
+  - file: 
+      type: gfonts
+      family: Roboto
+      weight: bold
+    id: font1
+    size: 18
+
+  - file:
+      type: gfonts
+      family: Roboto
+      weight: bold
+    id: font2
+    size: 22
+
+  - file:
+      type: gfonts
+      family: Roboto
+      weight: bold
+    id: font3
+    size: 30
+
+  - file: 'common/materialdesignicons-webfont.ttf'
+    id: icons
+    size: 20
+    glyphs: [
+        󰤮, # no-wifi
+        󰤯, # low-wifi
+        󰤟, # wifi-1
+        󰤢, # wifi-2
+        󰤥, # wifi-3
+        󰤨, # wifi-4
+        󰤷, # angle-acute
+        󰆌, # compass
+        󰃞, # brightness-5
+        󰽤, # moon-new
+        󰽧, # moon-waxing-crescent
+        󰽡, # moon-first-quarter
+        󰽨, # moon-waxing-gibbous
+        󰽢, # moon-full
+        󰽦, # moon-waning-gibbous
+        󰽣, # moon-last-quarter
+        󰽥, # moon-waning-crescent
+     ]
+
+color:
+  - id: my_red
+    red: 100%
+    green: 0%
+    blue: 0%
+  - id: my_green
+    red: 10%
+    green: 100%
+    blue: 0%
+  - id: my_light_green
+    red: 50%
+    green: 100%
+    blue: 50%
+  - id: my_blue
+    red: 0%
+    green: 0%
+    blue: 100%
+  - id: my_light_blue
+    red: 68%
+    green: 85%
+    blue: 90%
+  - id: my_yellow
+    red: 100%
+    green: 90%
+    blue: 0%
+  - id: my_white
+    red: 100%
+    green: 100%
+    blue: 100%
+  - id: my_black
+    red: 0%
+    green: 0%
+    blue: 0%
+  - id: my_grey
+    red: 50%
+    green: 50%
+    blue: 50%
+
+# render on the screen.
+display:
+  - platform: sdl
+    # TTGO TDisplay 135x240
+    # Spotpear desktop trinket Display 128x128
+    dimensions:
+      height: 128 # X
+      width: 128 # Y
+    id: my_display
+    # backlight_pin: no
+    auto_clear_enabled: false
+    # update_interval: 10s
+    rotation: 90°
+    pages:
+      # TTGO display pages
+      # - id: page1 # splash screen
+      #   lambda: |-
+      #     it.fill(my_black);
+      #     // it.print(4, 2, id(font2), my_white, "Virtual T-Display");
+      #     it.print(10, 50, id(icons), my_red, "󰤷");
+      #     it.print(10, 10, id(icons), my_green, "󰆌");
+      #     double sun_az_deg = id(astro_sun_az).state / id(rad) + 180;
+      #     it.printf(60, 15, id(font2), my_green, "Sun %0.2f°", sun_az_deg);
+      #     double sun_alt_deg = id(astro_sun_alt).state / id(rad) + 180 ;
+      #     it.printf(60, 55, id(font2), my_red, "Sun %0.2f°", sun_alt_deg );
+      #     it.print(5, 90, id(font1), my_blue, "Nodename ${nodename}");
+      #     it.print(5, 110, id(font1), my_blue, "©2025 Phil");
+      # - id: page2 # info screen
+      #   lambda: |-
+      #     it.fill(my_black);
+      #     //it.strftime(120, 30, id(font3), my_blue, TextAlign::TOP_CENTER, "%H:%M", id(my_time).now());
+      #     double moon_az_deg = id(astro_moon_az).state / id(rad) / 180 + 180; 
+      #     it.print(10, 10, id(icons), my_green, "󰆌");
+      #     it.print(10, 50, id(icons), my_red, "󰤷");
+      #     it.print(10, 90, id(icons), my_yellow, "󰃞");
+      #     int moon_age_int = int(id(astro_moonage).state);
+      #     it.print(190, 50, id(icons), my_yellow, moon_icon(moon_age_int));
+      #     it.printf(60, 15, id(font2), my_green, "Moon %.0f°", moon_az_deg);
+      #     double moon_alt_deg = id(astro_moon_alt).state / id(rad) + 180;
+      #     it.printf(60, 55, id(font2), my_red, "Moon %.0f°", moon_alt_deg);
+      #     it.printf(60, 95, id(font2), my_yellow, "%0.2f%%", id(astro_moonillumination).state);
+    #
+    # Spotpear display pages 
+      - id: page1 # image screen
+        lambda: |-
+          it.fill(my_black);
+          double moon_alt_deg = id(astro_moon_alt).state / id(rad);
+          // print the moon image and a circle around the moon
+          if (moon_alt_deg > 0) { 
+            it.image(2, 3, id(my_image), my_yellow, my_black);
+            it.circle(64, 65, 56, my_yellow);
+          } else { 
+            it.image(2, 3, id(my_image), my_grey, my_black);
+            it.circle(64, 65, 56, my_blue);
+          };
+          // print the altitude in the centre of the display
+          it.filled_rectangle(35, 45, 60, 35, COLOR_OFF);
+          it.printf(35, 45, id(font3), my_blue, "%.0f°", moon_alt_deg);
+          // print the moon position annotation
+          int moon_age_int = int(id(astro_moonage).state);       
+          it.print(id(annotation_moon_x).state, id(annotation_moon_y).state, id(icons), my_blue, moon_icon(moon_age_int));
+          // print the sun position annotation
+          it.filled_circle(id(annotation_sun_x).state, id(annotation_sun_y).state, 10, my_red);
+      - id: page2 # an info screen
+        lambda: |-
+          it.fill(my_black);
+          it.print(10, 0, id(font2), my_green, "Moon");
+          double moon_alt_deg = id(astro_moon_alt).state / id(rad);
+          it.printf(10, 20, id(font2), my_blue, "Alt %.2f°", moon_alt_deg);
+          double moon_az_deg = id(astro_moon_az).state / id(rad) + 180;
+          it.printf(10, 40, id(font2), my_blue, "Az %.2f°", moon_az_deg);
+          it.print(10, 60, id(font2), my_green, "Sun");
+          it.strftime(60, 60, id(font2), "%H:%M", id(astro_time).now());
+          double sun_alt_deg = id(astro_sun_alt).state / id(rad);
+          it.printf(10, 80, id(font2), my_red, "Alt %.2f°", sun_alt_deg);
+          double sun_az_deg = id(astro_sun_az).state / id(rad) + 180;
+          it.printf(10, 100, id(font2), my_red, "Az %.2f°", sun_az_deg);
+      - id: pageoff # an all-black screen
+        lambda: |-
+          it.fill(my_black);
+
+interval:
+  - interval: 15sec
+    then:
+      - if:
+          condition: 
+            display.is_displaying_page: page1
+          then:
+            - display.page.show: page2
+            # - lambda: |-
+            #     ESP_LOGI("hostdevice", "page2" );
+            - component.update: my_display
+          else:
+            - display.page.show: page1
+            # - lambda: |-
+            #     ESP_LOGI("hostdevice", "page1" );
+            - component.update: my_display
+
+#   # 2min is the min update frequency for timestamps, unfortunately
+  - interval: 2min
+    then:
+      - display.page.show: page2
+      # - component.update: my_time
+      - script.execute:
+          id: Astro_sunMoonCoords
+          astro_latitude: 44.2307
+          astro_longitude: -76.4813
+      - script.execute:
+          id: annotate

@@ -1,0 +1,557 @@
+# Gauge1
+# Spotpear desktop trinket is an ESP32C3 
+# with an attached 1.44inch 128x128 TFT color LCD screen, driven by ST7735S with a white LED screen
+# See the board schematic in /home/phil/esphome/ESP32-C3-1.44inch.pdf
+# The display - dc_pin: GPIO0, cs_pin: GPIO02, reset_pin: GPIO05 
+# Display is driven by a ST7735 SPI chip - clk_pin: GPIO03, mosi_pin: GPIO04, the miso_pin is nc
+# The display screen cannot be controlled: use it.fill(COLOR_OFF)
+# There are 4 physical buttons: Boot (GPIO9) (ESP32C3 pin 15) and reset (ESP32C3 pin 7: Reset), key1 (ESP32C3 GPIO8) and key2 (ESP32C3 GPIO10)
+# Boot pin is usable after boot is completed.  Key1 and Key2 are user programmable.
+# GPIO11 is connected to a red LED
+#
+# To reprogram the device, it is best to connect to the USB port on the computer running ESPHome Dashboard,
+# and use the "Plug into the computer running ESPHome Device Builder" install option to flash over the JTAG port
+# I am now using the arduino framework; using the esphome framework yields compile errors
+#
+# online_image: it has to be small (128x128) as there is no psram on the device: it runs out of memory on larger images
+# The image in here is jpg, binary, 1 bit per pixel
+#
+substitutions:
+  nodename: "gauge1"
+  nodeip: "192.168.0.126"
+  gatewayip: "192.168.0.1"
+  # timezone for use by the sntp time platform
+  my_timezone: !secret timezone 
+
+globals:
+  - id: rad
+    type: float
+    initial_value: 'std::numbers::pi / 180'
+
+packages:
+  astro: !include 
+    file: common/astro.yaml
+    vars:
+      entity_prefix: "astro_"
+
+script:
+  - id: annotate
+    then:
+      - number.set:
+          id: annotation_moon_x
+          value: !lambda |-
+            float moon_az_deg = id(astro_moon_az).state / id(rad) + 90;
+            float moon_x = 54 * cos(moon_az_deg * std::numbers::pi/180) + 54;
+            ESP_LOGI("Gauge1", "Moon X: %0.2f pix", moon_x);
+            return int(moon_x);
+      - number.set:
+          id: annotation_moon_y
+          value: !lambda |-
+            float moon_az_deg = id(astro_moon_az).state / id(rad) + 90;
+            float moon_y = 54 * sin(moon_az_deg * std::numbers::pi/180) + 54;
+            ESP_LOGI("Gauge1", "Moon Y: %0.2f pix", moon_y);
+            return int(moon_y);
+      - lambda: |-      
+          // print the moon annotation icon on the display
+          int moon_age_int = int(id(astro_moonage).state);
+          ESP_LOGI("Gauge1", "Moon icon: %s hex", moon_icon(moon_age_int));
+          id(my_display).print(id(annotation_moon_x).state, id(annotation_moon_y).state, id(icons), my_blue, TextAlign::CENTER, moon_icon(moon_age_int));
+      - number.set:
+          id: annotation_sun_x
+          value: !lambda |-
+            float sun_az_deg = id(astro_sun_az).state / id(rad) + 90;
+            float sun_x = 55 * cos(sun_az_deg * std::numbers::pi/180) + 61;
+            ESP_LOGI("Gauge1", "Sun X: %0.2f pix", sun_x);
+            return int(sun_x); 
+      - number.set:
+          id: annotation_sun_y
+          value: !lambda |-
+            float sun_az_deg = id(astro_sun_az).state / id(rad) + 90;
+            float sun_y = 55 * sin(sun_az_deg * std::numbers::pi/180) + 61;
+            ESP_LOGI("Gauge1", "Sun Y: %0.2f pix", sun_y);
+            return int(sun_y);
+      - lambda: |-      
+          // print the sun annotation on the display
+          id(my_display).filled_circle(id(annotation_sun_x).state, id(annotation_sun_y).state, 12, my_red);
+
+  - id: image_update
+    then:
+      - lambda: |-
+          std::string imageurl = "http://homeassistant.local:8123/local/MoonPhaseImages/Moon" + to_string(int(id(astro_moonage).state)) + "small.jpg";
+          id(my_image_url_string).publish_state(imageurl);
+          ESP_LOGI("Gauge1", "Moon Image url: %s", imageurl.c_str());
+      - online_image.set_url:
+          id: my_online_image
+          url: !lambda 'return id(my_image_url_string).state;'
+
+esphome:
+  name: ${nodename}
+  friendly_name: ${nodename}
+  on_boot:
+    priority: 600 # sensors set up
+    then:
+      - logger.log:
+          format: "Node initialized"
+          level: INFO
+      - display.page.show: page2 # splash screen
+      - delay: 90s
+      - script.execute: image_update
+
+esp32:
+  board: esp32-c3-devkitm-1
+  variant: ESP32C3
+  framework:
+    type: esp-idf    
+
+# Enable logging
+logger:
+  level: INFO
+
+debug:
+
+# # local LAN web server
+web_server:
+  version: 2
+  js_include: "./v2/www.js"
+  include_internal: True
+  local: true
+
+ota:
+  - platform: esphome
+    password: !secret gauge1_ota
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  reboot_timeout: 0s
+  on_connect:
+    - switch.turn_on: display_onoff
+
+  # Optional manual IP
+  manual_ip:
+    static_ip: ${nodeip}
+    gateway: ${gatewayip}
+    subnet: 255.255.255.0
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: "Gauge1"
+    password: ""
+    ap_timeout: 60s
+
+# allow user-entered WiFi credentials if conection to above wifi ssid fails
+captive_portal:
+
+button:
+  # buttons for shutdown and reboot
+  - platform: shutdown
+    name: shutdown
+
+  - platform: restart
+    name: "reboot"
+
+  # the logical button 1 (shows on the web page)
+  - platform: template
+    name: Button1
+    id: button1
+    on_press:
+      then:
+        - logger.log: 
+            format: "Button 1 pressed"
+            level: INFO
+        # - number.set:
+        #     id: display_timer
+        #     value: ${screen_timer}
+        - switch.turn_on: display_onoff
+        - display.page.show: page1
+        - component.update: my_online_image
+
+  # the logical button2 (shows on the web page)
+  - platform: template
+    name: Button2
+    id: button2
+    on_press:
+      then:
+        - logger.log: 
+            format: "Button 2 pressed"
+            level: INFO
+        # - number.set:
+        #     id: display_timer
+        #     value: ${screen_timer}
+        - switch.turn_on: display_onoff
+        - display.page.show: page2
+
+  # the logical boot button (shows on the web page)
+  - platform: template
+    name: Boot Button
+    id: boot_button
+    on_press:
+      then:
+        - logger.log: 
+            format: "Boot Button pressed"
+            level: INFO
+        - switch.turn_off: display_onoff
+
+switch:
+  # screen has no backlight control, so just write it.fill(my_black) to reduced light
+  - platform: template
+    name: Display On Off
+    optimistic: True
+    id: display_onoff
+    internal: True
+    restore_mode: ALWAYS_ON
+    turn_on_action:
+      then:
+        - display.page.show: page1
+    turn_off_action:
+      then:
+        - display.page.show: pageoff
+
+binary_sensor:
+  # status for HA
+  - platform: status
+    name: Status
+    
+  # key 1
+  - platform: gpio
+    pin:
+      number: GPIO8
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+    id: key1
+    internal: True
+    filters:
+      - delayed_on_off: 50ms
+    on_state:
+      - logger.log:
+          format: "Key1 pressed"
+          level: INFO
+      - button.press: button1
+
+  # key 2
+  - platform: gpio
+    pin:
+      number: GPIO10
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+    id: key2
+    internal: True
+    filters:
+      - delayed_on_off: 50ms
+    on_state:
+      - logger.log:
+          format: "Key2 pressed"
+          level: INFO
+      - button.press: button2
+
+  # key 3 (Boot): turn off display screen
+  - platform: gpio
+    pin:
+      number: GPIO9
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+    id: key3
+    internal: True
+    filters:
+      - delayed_on_off: 50ms
+    on_state:
+      - logger.log:
+          format: "Boot key pressed"
+          level: INFO
+      - button.press: boot_button
+
+light:
+  # Status LED shares the red led between status and an addressable light
+  # flashes when there is a warning or error on startup
+  - platform: status_led
+    name: Red LED
+    id: red_led
+    pin: GPIO11
+    on_turn_on:
+      - logger.log:
+          format: "Red LED ON"
+          level: INFO
+    on_turn_off:
+      - logger.log:
+          format: "Red LED OFF"
+          level: INFO
+
+text_sensor:
+  - platform: wifi_info
+    ip_address:
+      name: IP Address
+
+  - platform: uptime
+    name: Uptime
+    id: my_uptime
+    update_interval: 1 min
+    internal: True
+
+  - platform: template
+    name: My Image URL String
+    id: my_image_url_string
+    internal: True
+
+sensor:
+  - platform: wifi_signal
+    name: WiFi RSSI
+    id: wifi_rssi
+    update_interval: 60s
+    internal: True
+
+  - platform: copy # Reports the WiFi signal strength in %
+    source_id: wifi_rssi
+    name: "WiFi Signal Percent"
+    id: wifi_signal_pct
+    filters:
+      - lambda: return min(max(2 * (x + 100.0), 0.0), 100.0);
+    unit_of_measurement: "%"
+    entity_category: "diagnostic"
+    device_class: power factor
+    internal: True
+
+number:
+  - platform: template
+    name: Moon X
+    id: annotation_moon_x
+    unit_of_measurement: "pixels"
+    min_value: 0
+    max_value: 128
+    step: 1
+    optimistic: True
+    internal: True
+    mode: box
+
+  - platform: template
+    name: Moon Y
+    id: annotation_moon_y
+    unit_of_measurement: "pixels"
+    min_value: 0
+    max_value: 128
+    step: 1
+    optimistic: True
+    internal: True
+    mode: box
+
+  - platform: template
+    name: Sun X
+    id: annotation_sun_x
+    unit_of_measurement: "pixels"
+    min_value: 0
+    max_value: 128
+    step: 1
+    optimistic: True
+    internal: True
+    mode: box
+
+  - platform: template
+    name: Sun Y
+    id: annotation_sun_y
+    unit_of_measurement: "pixels"
+    min_value: 0
+    max_value: 128
+    step: 1
+    optimistic: True
+    internal: True
+    mode: box
+
+font:
+  # some fonts for the display
+  - file: 
+      type: gfonts
+      family: Roboto
+      weight: bold
+    id: font1
+    size: 16
+
+  - file:
+      type: gfonts
+      family: Roboto
+      weight: bold
+    id: font2
+    size: 22
+
+  - file:
+      type: gfonts
+      family: Roboto
+      weight: bold
+    id: font3
+    size: 32
+
+  - file: 'common/materialdesignicons-webfont.ttf'
+    id: icons
+    size: 26
+    glyphs: [
+      󰽤, # moon-new
+      󰽧, # moon-waxing-crescent
+      󰽡, # moon-first-quarter
+      󰽨, # moon-waxing-gibbous
+      󰽢, # moon-full
+      󰽦, # moon-waning-gibbous
+      󰽣, # moon-last-quarter
+      󰽥, # moon-waning-crescent
+     ]
+
+color:
+  - id: my_red
+    hex: 'FF0000'
+  - id: my_green
+    red: 10%
+    green: 100%
+    blue: 0%
+  - id: my_light_green
+    red: 50%
+    green: 100%
+    blue: 50%
+  - id: my_blue
+    hex: '0000FF'
+  - id: my_light_blue
+    red: 68%
+    green: 85%
+    blue: 90%
+  - id: my_yellow
+    red: 100%
+    green: 90%
+    blue: 0%
+  - id: my_white
+    hex: 'FFFFFF'
+  - id: my_grey
+    hex: '5A5A5A'
+  - id: my_black
+    hex: '000000'
+
+http_request:
+  id: my_http_request
+  verify_ssl: False
+  timeout: 20s
+  watchdog_timeout: 20s
+
+# online image
+online_image:
+  - id: my_online_image
+    url: "http://homeassistant.local:8123/local/MoonPhaseImages/Moon7small.jpg" # never gets shown
+    format: JPG
+    type: BINARY
+    on_download_finished:
+      - lambda: |-
+          if (cached) {
+            ESP_LOGI("Gauge1", "Cache hit: using cached image");
+          } else {
+            ESP_LOGI("Gauge1", "Cache miss: fresh download");
+            // print the moon image
+            id(my_display).image(0, 0, id(my_online_image), my_yellow, my_black);
+          }
+
+spi:
+  id: myspi0
+  interface: SPI
+  clk_pin: GPIO03
+  mosi_pin: GPIO04
+  # miso_pin: GPIOXX
+
+display:
+  - platform: ili9xxx
+    id: my_display
+    model: ST7735
+    dc_pin: GPIO0
+    cs_pin: GPIO02
+    reset_pin: GPIO05
+    invert_colors: false
+    color_order: bgr
+    show_test_card: false
+    auto_clear_enabled: false
+    dimensions: 128x128
+    pages:
+      - id: page1 # image screen
+        lambda: |-
+          // Draw the image my_image at position [x=0,y=0]
+          it.fill(my_black);
+          it.image(0, 0, id(my_online_image), my_yellow, my_black);
+          // print the altitude in the centre of the display
+          double moon_alt_deg = id(astro_moon_alt).state / id(rad);
+          it.printf(44, 44, id(font2), my_white, "%.0f°", moon_alt_deg);
+          // print a circle around the moon
+          if (id(astro_moon_alt).state > 0) { it.circle(64, 66, 56, my_yellow); } else { it.circle(64, 66, 56, my_blue); };
+          // print the moon position annotation
+          int moon_age_int = int(id(astro_moonage).state);       
+          it.print(id(annotation_moon_x).state, id(annotation_moon_y).state, id(icons), my_blue, moon_icon(moon_age_int));
+          // print the sun position annotation
+          it.filled_circle(id(annotation_sun_x).state, id(annotation_sun_y).state, 10, my_red);
+      - id: page2 # an info screen
+        lambda: |-
+          it.fill(my_black);
+          it.print(10, 5, id(font2), my_green, "Moon");
+          double moon_alt_deg = id(astro_moon_alt).state / id(rad);
+          it.printf(10, 25, id(font2), my_blue, "Alt %.2f°", moon_alt_deg);
+          double moon_az_deg = id(astro_moon_az).state / id(rad) + 180;
+          it.printf(10, 45, id(font2), my_blue, "Az %.2f°", moon_az_deg);
+          it.print(10, 65, id(font2), my_green, "Sun");
+          it.strftime(60, 65, id(font2), "%H:%M", id(my_time).now());
+          double sun_alt_deg = id(astro_sun_alt).state / id(rad);
+          it.printf(10, 85, id(font2), my_red, "Alt %.2f°", sun_alt_deg);
+          double sun_az_deg = id(astro_sun_az).state / id(rad) + 180;
+          it.printf(10, 105, id(font2), my_red, "Az %.2f°", sun_az_deg);
+      - id: pageoff # an all-black screen
+        lambda: |-
+          it.fill(my_black);
+
+time:
+  - platform: sntp
+    id: my_time
+    timezone: ${my_timezone}
+    servers:
+      - 54.39.23.64
+      - 23.159.16.194
+      - 23.133.168.246
+    on_time:
+
+      # Every morning
+      - seconds: 0
+        minutes: 0
+        hours: 6
+        then:
+          - switch.turn_on: display_onoff
+
+
+      # Every evening
+      - seconds: 0
+        minutes: 30
+        hours: 21
+        then:
+          - switch.turn_off: display_onoff
+
+interval:
+  - interval: 15sec
+    then:
+      - if:
+          condition: 
+            switch.is_on: display_onoff
+          then:
+            - if:
+                condition: 
+                  display.is_displaying_page: page1
+                then:
+                  - display.page.show: page2
+                else:
+                  - display.page.show: page1
+
+  # 2 min is the min update frequency for timestamps, unfortunately
+  - interval: 2min
+    then:
+      - script.execute:
+          id: Astro_sunMoonCoords
+          astro_latitude: 44.2307
+          astro_longitude: -76.4813
+      - script.execute:
+          id: annotate
+
+  - interval: 1h
+    then:
+      - script.execute:
+          id: image_update
