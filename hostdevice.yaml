@@ -206,7 +206,7 @@ font:
 
   - file: 'common/materialdesignicons-webfont.ttf'
     id: icons
-    size: 20
+    size: 24
     glyphs: [
         󰤮, # no-wifi
         󰤯, # low-wifi
@@ -321,8 +321,8 @@ display:
             it.circle(64, 65, 56, my_blue);
           };
           // print the altitude in the centre of the display
-          it.filled_rectangle(35, 45, 60, 35, COLOR_OFF);
-          it.printf(35, 45, id(font3), my_blue, "%.0f°", moon_alt_deg);
+          it.filled_circle(64, 64, 32, COLOR_OFF);
+          it.printf(64, 45, id(font3), my_blue, TextAlign::TOP_CENTER, "%.0f°", moon_alt_deg);
           // print the moon position annotation
           int moon_age_int = int(id(astro_moonage).state);       
           it.print(id(annotation_moon_x).state, id(annotation_moon_y).state, id(icons), my_blue, moon_icon(moon_age_int));
@@ -333,15 +333,15 @@ display:
           it.fill(my_black);
           it.print(10, 0, id(font2), my_green, "Moon");
           double moon_alt_deg = id(astro_moon_alt).state / id(rad);
-          it.printf(10, 20, id(font2), my_blue, "Alt %.2f°", moon_alt_deg);
+          it.printf(10, 20, id(font2), my_blue, "Alt %.1f°", moon_alt_deg);
           double moon_az_deg = id(astro_moon_az).state / id(rad) + 180;
-          it.printf(10, 40, id(font2), my_blue, "Az %.2f°", moon_az_deg);
+          it.printf(10, 40, id(font2), my_blue, "Az %.1f°", moon_az_deg);
           it.print(10, 60, id(font2), my_green, "Sun");
           it.strftime(60, 60, id(font2), "%H:%M", id(astro_time).now());
           double sun_alt_deg = id(astro_sun_alt).state / id(rad);
-          it.printf(10, 80, id(font2), my_red, "Alt %.2f°", sun_alt_deg);
+          it.printf(10, 80, id(font2), my_red, "Alt %.1f°", sun_alt_deg);
           double sun_az_deg = id(astro_sun_az).state / id(rad) + 180;
-          it.printf(10, 100, id(font2), my_red, "Az %.2f°", sun_az_deg);
+          it.printf(10, 100, id(font2), my_red, "Az %.1f°", sun_az_deg);
       - id: pageoff # an all-black screen
         lambda: |-
           it.fill(my_black);
