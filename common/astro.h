@@ -18,19 +18,32 @@ double phi; // User Latitude in radians
 double lw; // User Longitude in radians
 double ST; // siderealTime
 
+// sun & moon coords (ra,dec) in radians
 struct coords_struct {
     double dec;
     double ra;
 };
+coords_struct sun_coords, moon_coords ;
+
+// sun & moon position (alt,az) in radians
 struct position_struct {
     double alt;
     double az;
 };
+position_struct sun_position, moon_position ;
+
+// sun & moon transit, rise, fall times
 struct riseset_struct {
     float transit;
     float rise;
     float set;
 };
+riseset_struct sun_riseset, moon_riseset ;
+
+// moon phase, illumination
+float moon_phase ;
+float moon_illumination ;
+
 void init(float my_utc_offset, float my_latitude, float my_longitude) {
     utc_offset = my_utc_offset ;
     phi = ( toRad * my_latitude ) ;
@@ -131,7 +144,7 @@ float constrain(float v){
 	if(v>1){return v-1;}
 	return v;
 }
-riseset_struct getRiseSet (float h0, float ra, float dec) {
+riseset_struct getRiseSet (float h0, double ra, double dec) {
     // all input parameters in radians
 	    //const h0=-0.8333 //For Sun
 	    //const h0=-0.5667 //For stars and planets

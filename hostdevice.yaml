@@ -24,6 +24,7 @@ globals:
 
 packages:
   astro: !include 
+    url: https://github.com/philpownall/ESPHomeSunMoon
     file: common/astro.yaml
     vars:
       entity_prefix: "astro_"
@@ -35,16 +36,16 @@ script:
       - number.set:
           id: annotation_moon_x
           value: !lambda |-
-            float moon_az_deg = id(astro_moon_az).state / id(rad) + 90;
+            float moon_az_deg = id(astro_moon_az).state - 90;
             float moon_x = 54 * cos(moon_az_deg * std::numbers::pi/180) + 54;
-            ESP_LOGI("hostdevice", "Moon X: %0.2f pix", moon_x);
+            ESP_LOGI("hostdevice", "Moon X: %i px", int(moon_x));
             return int(moon_x);
       - number.set:
           id: annotation_moon_y
           value: !lambda |-
-            float moon_az_deg = id(astro_moon_az).state / id(rad) + 90;
+            float moon_az_deg = id(astro_moon_az).state - 90;
             float moon_y = 54 * sin(moon_az_deg * std::numbers::pi/180) + 54;
-            ESP_LOGI("hostdevice", "Moon Y: %0.2f pix", moon_y);
+            ESP_LOGI("hostdevice", "Moon Y: %i px", int(moon_y));
             return int(moon_y);
       - lambda: |-      
           // print the moon annotation icon on the display
@@ -54,16 +55,16 @@ script:
       - number.set:
           id: annotation_sun_x
           value: !lambda |-
-            float sun_az_deg = id(astro_sun_az).state / id(rad) + 90;
+            float sun_az_deg = id(astro_sun_az).state - 90;
             float sun_x = 55 * cos(sun_az_deg * std::numbers::pi/180) + 61;
-            ESP_LOGI("hostdevice", "Sun X: %0.2f pix", sun_x);
+            ESP_LOGI("hostdevice", "Sun X: %i px", int(sun_x));
             return int(sun_x); 
       - number.set:
           id: annotation_sun_y
           value: !lambda |-
-            float sun_az_deg = id(astro_sun_az).state / id(rad) + 90;
+            float sun_az_deg = id(astro_sun_az).state - 90;
             float sun_y = 55 * sin(sun_az_deg * std::numbers::pi/180) + 61;
-            ESP_LOGI("hostdevice", "Sun Y: %0.2f pix", sun_y);
+            ESP_LOGI("hostdevice", "Sun Y: %i px", int(sun_y));
             return int(sun_y);
       - lambda: |-      
           // print the sun annotation on the display
@@ -96,7 +97,7 @@ number:
   - platform: template
     name: Moon X
     id: annotation_moon_x
-    unit_of_measurement: "pixels"
+    unit_of_measurement: "px"
     min_value: 0
     max_value: 128
     step: 1
@@ -107,7 +108,7 @@ number:
   - platform: template
     name: Moon Y
     id: annotation_moon_y
-    unit_of_measurement: "pixels"
+    unit_of_measurement: "px"
     min_value: 0
     max_value: 128
     step: 1
@@ -118,7 +119,7 @@ number:
   - platform: template
     name: Sun X
     id: annotation_sun_x
-    unit_of_measurement: "pixels"
+    unit_of_measurement: "px"
     min_value: 0
     max_value: 128
     step: 1
@@ -129,7 +130,7 @@ number:
   - platform: template
     name: Sun Y
     id: annotation_sun_y
-    unit_of_measurement: "pixels"
+    unit_of_measurement: "px"
     min_value: 0
     max_value: 128
     step: 1
@@ -202,7 +203,7 @@ font:
       family: Roboto
       weight: bold
     id: font3
-    size: 30
+    size: 28
 
   - file: 'common/materialdesignicons-webfont.ttf'
     id: icons
@@ -311,7 +312,7 @@ display:
       - id: page1 # image screen
         lambda: |-
           it.fill(my_black);
-          double moon_alt_deg = id(astro_moon_alt).state / id(rad);
+          double moon_alt_deg = id(astro_moon_alt).state ;
           // print the moon image and a circle around the moon
           if (moon_alt_deg > 0) { 
             it.image(2, 3, id(my_image), my_yellow, my_black);
@@ -321,8 +322,12 @@ display:
             it.circle(64, 65, 56, my_blue);
           };
           // print the altitude in the centre of the display
-          it.filled_circle(64, 64, 32, COLOR_OFF);
-          it.printf(64, 45, id(font3), my_blue, TextAlign::TOP_CENTER, "%.0f°", moon_alt_deg);
+          it.printf(64, 64, id(font3), my_black, TextAlign::CENTER, "%.0f°", moon_alt_deg);
+          if (moon_alt_deg > 0) {
+            it.printf(64, 64, id(font2), my_blue, TextAlign::CENTER, "%.0f°", moon_alt_deg);
+          } else {
+            it.printf(64, 64, id(font2), my_green, TextAlign::CENTER, "%.0f°", moon_alt_deg);
+          }
           // print the moon position annotation
           int moon_age_int = int(id(astro_moonage).state);       
           it.print(id(annotation_moon_x).state, id(annotation_moon_y).state, id(icons), my_blue, moon_icon(moon_age_int));
@@ -332,15 +337,15 @@ display:
         lambda: |-
           it.fill(my_black);
           it.print(10, 0, id(font2), my_green, "Moon");
-          double moon_alt_deg = id(astro_moon_alt).state / id(rad);
+          double moon_alt_deg = id(astro_moon_alt).state;
           it.printf(10, 20, id(font2), my_blue, "Alt %.1f°", moon_alt_deg);
-          double moon_az_deg = id(astro_moon_az).state / id(rad) + 180;
+          double moon_az_deg = id(astro_moon_az).state;
           it.printf(10, 40, id(font2), my_blue, "Az %.1f°", moon_az_deg);
           it.print(10, 60, id(font2), my_green, "Sun");
           it.strftime(60, 60, id(font2), "%H:%M", id(astro_time).now());
-          double sun_alt_deg = id(astro_sun_alt).state / id(rad);
+          double sun_alt_deg = id(astro_sun_alt).state;
           it.printf(10, 80, id(font2), my_red, "Alt %.1f°", sun_alt_deg);
-          double sun_az_deg = id(astro_sun_az).state / id(rad) + 180;
+          double sun_az_deg = id(astro_sun_az).state;
           it.printf(10, 100, id(font2), my_red, "Az %.1f°", sun_az_deg);
       - id: pageoff # an all-black screen
         lambda: |-

@@ -22,10 +22,12 @@ script:
             float my_hr = (id(${entity_prefix}time).now().hour);
             float myutc_hr = (id(${entity_prefix}time).utcnow().hour);
             float utc_offset = myutc_hr - my_hr;
+            if (utc_offset < 0) utc_offset += 24;
             Astro::init(utc_offset, astro_latitude, astro_longitude ) ;
             Astro::julian_day( myt ) ;
             Astro::day() ;
             Astro::siderealTime() ;
+            ESP_LOGI("Astro", "... On %s",id(${entity_prefix}time).now().strftime("%Y-%m-%d").c_str());
             ESP_LOGI("Astro", "Timestamp %i seconds", int(myt) );
             ESP_LOGI("Astro", "Astro Day %f days", Astro::d );
             ESP_LOGI("Astro", "Julian Day %f days", Astro::jd );
@@ -42,52 +44,60 @@ script:
       # 3. set the sun rightAscension(ecl,0) = atan2((sin(ecl) * cos(e) - tan(0) * sin(e)), cos(ecl))
       # 4. Set the sun declination(ecl,0) = asin(sin(0) * cos(e) + cos(0) * sin(e) * sin(ecl))
       - lambda: |-
-            Astro::coords_struct astro_sun_coords = Astro::getCoords (Astro::eclipticLongitude (Astro::solarMeanAnomaly (Astro::d)),0);
-            id(${entity_prefix}sun_ra).publish_state (astro_sun_coords.ra);
-            id(${entity_prefix}sun_dec).publish_state (astro_sun_coords.dec);
+            Astro::sun_coords = Astro::getCoords (Astro::eclipticLongitude (Astro::solarMeanAnomaly (Astro::d)),0);
+            id(${entity_prefix}sun_ra).publish_state (Astro::sun_coords.ra / id(my_rad));
+            id(${entity_prefix}sun_dec).publish_state (Astro::sun_coords.dec / id(my_rad));
       # 5. Set the sun azimuth(H, phi, dec) = atan2( sin(H),( cos(H) * sin(phi) - tan(dec) * cos(phi)) )
       # 6. set the sun altitude(H, phi, dec) = asin(sin(phi) * sin(dec) + cos(phi) * cos(dec) * cos(H))
       - lambda: |-
-          double H  = Astro::ST - id(${entity_prefix}sun_ra).state ;
-          Astro::position_struct astro_sun_position = Astro::getPosition (H, Astro::phi, id(${entity_prefix}sun_dec).state);
-          id(${entity_prefix}sun_az).publish_state (astro_sun_position.az);
-          id(${entity_prefix}sun_alt).publish_state (astro_sun_position.alt);
+          double H  = Astro::ST - Astro::sun_coords.ra ;
+          Astro::sun_position = Astro::getPosition (H, Astro::phi, Astro::sun_coords.dec);
+          // Note the +180 to correct [-180,180] to [0,360].
+          id(${entity_prefix}sun_az).publish_state (Astro::sun_position.az / id(my_rad) + 180);
+          id(${entity_prefix}sun_alt).publish_state (Astro::sun_position.alt / id(my_rad));
       # Now, for the Moon parameters:
       # 7. set the moon Right Ascension
       # 8. Set the moon Declination
       - lambda: |-
-          Astro::coords_struct astro_moon_coords = Astro::getMoonCoords(Astro::d);
-          id(${entity_prefix}moon_ra).publish_state (astro_moon_coords.ra);
-          id(${entity_prefix}moon_dec).publish_state (astro_moon_coords.dec);
+          Astro::moon_coords = Astro::getMoonCoords(Astro::d);
+          id(${entity_prefix}moon_ra).publish_state (Astro::moon_coords.ra / id(my_rad));
+          id(${entity_prefix}moon_dec).publish_state (Astro::moon_coords.dec / id(my_rad));
       # 9. Set the moon Azimuth
       # 10. Set the moon Altitude
       - lambda: |-
-          double H  = Astro::ST - id(${entity_prefix}moon_ra).state ;
-          Astro::position_struct astro_moon_position = Astro::getPosition (H, Astro::phi, id(${entity_prefix}moon_dec).state);
-          id(${entity_prefix}moon_az).publish_state (astro_moon_position.az);
-          id(${entity_prefix}moon_alt).publish_state (astro_moon_position.alt);
+          double H  = Astro::ST - Astro::moon_coords.ra ;
+          Astro::moon_position = Astro::getPosition (H, Astro::phi, Astro::moon_coords.dec);
+          id(${entity_prefix}moon_az).publish_state (Astro::moon_position.az / id(my_rad) + 180);
+          id(${entity_prefix}moon_alt).publish_state (Astro::moon_position.alt / id(my_rad));
       # 11. Set the moon Phase Angle
       - sensor.template.publish: 
           id: ${entity_prefix}moon_phase
-          state: !lambda 'return Astro::moonphaseangle(id(${entity_prefix}sun_dec).state, id(${entity_prefix}sun_ra).state, id(${entity_prefix}moon_dec).state, id(${entity_prefix}moon_ra).state) ;'
+          state: !lambda |-
+            Astro::moon_phase = Astro::moonphaseangle(Astro::sun_coords.dec, Astro::sun_coords.ra, Astro::moon_coords.dec, Astro::moon_coords.ra) ;
+            return Astro::moon_phase / id(my_rad) ;
       # 12. Set the moon illumination
       - sensor.template.publish: 
           id: ${entity_prefix}moon_illumination
-          state: !lambda 'return Astro::moonillumination(id(${entity_prefix}moon_phase).state) ;'
+          state: !lambda |-
+            Astro::moon_illumination = Astro::moonillumination(Astro::moon_phase) ;
+            return Astro::moon_illumination ;
       # 13. Set the moon phase name
       - text_sensor.template.publish:
           id: ${entity_prefix}moon_phase_name
           state: !lambda 'return Astro::moonphasetext(int(id(${entity_prefix}moonage).state));'
       # 14. Sun Rise/Set, Moon Rise/Set
       - lambda: |-
-          Astro::riseset_struct sun_rise_set = Astro::getRiseSet (-0.8333, id(${entity_prefix}sun_ra).state, id(${entity_prefix}sun_dec).state);
-          ESP_LOGI("Astro", "Sun transit: %f rise: %f set: %f ", sun_rise_set.transit, sun_rise_set.rise, sun_rise_set.set );
-          Astro::riseset_struct moon_rise_set = Astro::getRiseSet (0.125, id(${entity_prefix}moon_ra).state, id(${entity_prefix}moon_dec).state);
-          ESP_LOGI("Astro", "Moon transit: %f rise: %f set: %f ", moon_rise_set.transit, moon_rise_set.rise, moon_rise_set.set );
+          Astro::sun_riseset = Astro::getRiseSet (-0.8333, Astro::sun_coords.ra, Astro::sun_coords.dec);
+          ESP_LOGI("Astro", "Sun transit: %f rise: %f set: %f ", Astro::sun_riseset.transit, Astro::sun_riseset.rise, Astro::sun_riseset.set );
+          Astro::moon_riseset = Astro::getRiseSet (0.125, Astro::moon_coords.ra, Astro::moon_coords.dec);
+          ESP_LOGI("Astro", "Moon transit: %f rise: %f set: %f ", Astro::moon_riseset.transit, Astro::moon_riseset.rise, Astro::moon_riseset.set );
 
 time:
   - platform: host
     id: ${entity_prefix}time
+    on_time_sync:
+      then:
+        - logger.log: "Synchronized system clock"
 
 number:
   - platform: template
@@ -109,109 +119,106 @@ sensor:
     update_interval: never
     on_value:
       - lambda: |-
-          ESP_LOGI("Astro", "Moon Illumination %0.1f%%", id(astro_moon_illumination).state);
+          ESP_LOGI("Astro", "Moon Illumination %0.1f%%", x);
 
   - platform: template
     name: Moon Phase
     id: ${entity_prefix}moon_phase
-    unit_of_measurement: "rad"
+    unit_of_measurement: "°"
     internal: True
     update_interval: never
     on_value:
       - lambda: |-
-          double moon_phase_deg = x / id(my_rad);
-          ESP_LOGI("Astro", "Moon Phase: %f°", moon_phase_deg);
+          // double moon_phase_deg = x / id(my_rad);
+          ESP_LOGI("Astro", "Moon Phase: %f°", x);
 
   - platform: template
     name: Sun Azimuth
     id: ${entity_prefix}sun_az
-    unit_of_measurement: "rad"
+    unit_of_measurement: "°"
     internal: True
     update_interval: never
     on_value:
       - lambda: |-
-          // Note the +180 to correct [-180,180] to [0,360].
-          double astro_sun_az_deg = x / id(my_rad) + 180;
-          ESP_LOGI("Astro", "Sun Azimuth: %f°", astro_sun_az_deg);
+          // double astro_sun_az_deg = x + 180;
+          ESP_LOGI("Astro", "Sun Azimuth: %f°", x);
      
   - platform: template
     name: Moon Azimuth
     id: ${entity_prefix}moon_az
-    unit_of_measurement: "rad"
+    unit_of_measurement: "°"
     internal: True
     update_interval: never
     on_value:
       - lambda: |-
-          // Note the +180 to correct [-180,180] to [0,360].
-          double astro_moon_az_deg = x / id(my_rad) + 180;
-          ESP_LOGI("Astro", "Moon Azimuth: %f°", astro_moon_az_deg);
+          // double astro_moon_az_deg = x + 180;
+          ESP_LOGI("Astro", "Moon Azimuth: %f°", x);
 
   - platform: template
     name: Sun Altitude
     id: ${entity_prefix}sun_alt
-    unit_of_measurement: "rad"
+    unit_of_measurement: "°"
     internal: True
     update_interval: never
     on_value:
       - lambda: |-
-          double sun_alt_deg = x / id(my_rad);
-          ESP_LOGI("Astro", "Sun Altitude: %f°", sun_alt_deg);
+          // double sun_alt_deg = x / id(my_rad);
+          ESP_LOGI("Astro", "Sun Altitude: %f°", x);
 
   - platform: template
     name: Moon Altitude
     id: ${entity_prefix}moon_alt
-    unit_of_measurement: "rad"
+    unit_of_measurement: "°"
     internal: True
     update_interval: never
     on_value:
       - lambda: |-
-          // print the altitude (page2)
-          double moon_alt_deg = x / id(my_rad);
-          ESP_LOGI("Astro", "Moon Altitude: %f°", moon_alt_deg);
+          // double moon_alt_deg = x / id(my_rad);
+          ESP_LOGI("Astro", "Moon Altitude: %f°", x);
  
   - platform: template
     name: Sun Right Ascension
     id: ${entity_prefix}sun_ra
-    unit_of_measurement: "rad"
+    unit_of_measurement: "°"
     internal: True
     update_interval: never
     on_value:
       - lambda: |-
-          double astro_sun_ra_deg = x / id(my_rad) ; 
-          ESP_LOGI("Astro", "Sun Right Ascension: %f°", astro_sun_ra_deg);
+          // double astro_sun_ra_deg = x / id(my_rad) ; 
+          ESP_LOGI("Astro", "Sun Right Ascension: %f°", x);
 
   - platform: template
     name: Moon Right Ascension
     id: ${entity_prefix}moon_ra
-    unit_of_measurement: "rad"
+    unit_of_measurement: "°"
     internal: True
     update_interval: never
     on_value:
       - lambda: |-
-          double moon_ra_deg = x / id(my_rad); 
-          ESP_LOGI("Astro", "Moon Right Ascension: %f°", moon_ra_deg);
+          // double moon_ra_deg = x / id(my_rad); 
+          ESP_LOGI("Astro", "Moon Right Ascension: %f°", x);
 
   - platform: template
     name: Sun Declination
     id: ${entity_prefix}sun_dec
-    unit_of_measurement: "rad"
+    unit_of_measurement: "°"
     internal: True
     update_interval: never
     on_value:
       - lambda: |-
-          double sun_dec_deg = x / id(my_rad) ;
-          ESP_LOGI("Astro", "Sun Declination: %f°", sun_dec_deg);
+          // double sun_dec_deg = x / id(my_rad) ;
+          ESP_LOGI("Astro", "Sun Declination: %f°", x);
 
   - platform: template
     name: Moon Declination
     id: ${entity_prefix}moon_dec
-    unit_of_measurement: "rad"
+    unit_of_measurement: "°"
     internal: True
     update_interval: never
     on_value:
       - lambda: |-
-          double moon_dec_deg = x / id(my_rad) ;
-          ESP_LOGI("Astro", "Moon Declination: %f°", moon_dec_deg);
+          // double moon_dec_deg = x / id(my_rad) ;
+          ESP_LOGI("Astro", "Moon Declination: %f°", x);
 
 text_sensor:
   - platform: template

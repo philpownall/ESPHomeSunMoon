@@ -7,10 +7,11 @@ How to calculate the Sun and Moon positions - altitude, azimuth, phase, images, 
 Quick Install
 -------------
 
-1. include the astro.yaml package in a "packages:" component (place the file in common/config).
+1. include the astro.yaml package in a "packages:" component.
 ```yaml
 packages:
   astro: !include 
+    url: https://github.com/philpownall/ESPHomeSunMoon
     file: common/astro.yaml
     vars:
       entity_prefix: "astro_"
@@ -26,7 +27,7 @@ interval:
           astro_latitude: 44.2307
           astro_longitude: -76.4813            
 ```
-3. (optional) Define the Moon phase glyphs in an icon font if you print the moon phase icon
+3. (optional) Define the Moon phase glyphs in an icon font if you print the moon phase icon.
 ```yaml
   - file: 'fonts/materialdesignicons-webfont.ttf'
     id: icons
@@ -94,9 +95,7 @@ New Sun and Moon sensors are added in the "sensors:" component of the user's dev
 Note the sensor id's expanded from the entity_prefix var in the packages component - these id's must not conflict with user-defined sensor id's.
 These sensor id's can be used (for example) in display printf statements.
 
-Note that the right ascension, declination, azimuth and altitude sensors are in radians, and the states must be multiplied by 180/pi to get degrees.
-
-Note also that the right ascension and azimuth sensor values range from -180 to +180 degrees. To get a range from 0 to 360, we add 180 to the sensor values (see astro.yaml).
+Note also that the azimuth sensor values range from -180 to +180 degrees. To get a range from 0 to 360, we add 180 to the sensor values (see astro.yaml).
 
 Examples of printf logfile statements that output the sensor values in degrees are found within the astro.yaml, hostdevice.yaml and the gauge1.yaml sample files.
 
