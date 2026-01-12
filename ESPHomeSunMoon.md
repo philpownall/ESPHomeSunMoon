@@ -1,4 +1,4 @@
-ESPHome_Sun_and_Moon
+ESPHomeSunMoon
 ====================
 
 How to calculate the Sun and Moon positions - altitude, azimuth, phase, images, icons, etc - using ESPHome on an ESP32 device.
@@ -110,7 +110,6 @@ The Sun and Moon sensors are:
 - Moon Altitude, id: ${entity_prefix}moon_alt
 - Moon Phase, id: ${entity_prefix}moon_phase
 - Moon Illumination, id: ${entity_prefix}moon_illumination
-- Moon Phase Name, id: ${entity_prefix}moon_phase_name
 
 A time platform is also defined in the "time:" component.  It is used by the astro_ functions for the timestamp.
 - Time, id: ${entity_prefix}time
