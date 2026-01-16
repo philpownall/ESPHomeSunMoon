@@ -1,7 +1,7 @@
 // Thanks to https://community.home-assistant.io/u/Tofandel
 const char * moon_icon(int moon_age) {
 	if (moon_age < 2)
-       return "󰽧";  // moon-new
+       return "󰽤";  // moon-new
 	else if (moon_age < 7)
        return "󰽧"; // moon-waxing-crescent
 	else if (moon_age < 8)
@@ -17,5 +17,5 @@ const char * moon_icon(int moon_age) {
 	else if (moon_age < 28)
        return "󰽥"; // moon-waning-crescent
 	else
-       return "󰽧"; // moon-new
+       return "󰽤"; // moon-new
 }
