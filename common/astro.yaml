@@ -18,7 +18,7 @@ script:
       # the astro_ functions are C++ functions defined in the includes: file astro.h 
       # astro_day sets the time for the other functions
       - lambda: |-
-            double myt = static_cast<double>(id(${entity_prefix}time).now().timestamp);
+            double myt = static_cast<double>(id(${entity_prefix}time).utcnow().timestamp);
             float my_hr = (id(${entity_prefix}time).now().hour);
             float myutc_hr = (id(${entity_prefix}time).utcnow().hour);
             float utc_offset = myutc_hr - my_hr;
