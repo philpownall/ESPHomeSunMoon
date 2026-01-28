@@ -227,5 +227,5 @@ text_sensor:
     update_interval: never
     on_value:
       - lambda: |-
-          ESP_LOGI("Astro", "Moon Phase Name: %s", id(astro_moon_phase_name).state.c_str());
+          ESP_LOGI("Astro", "Moon Phase Name: %s", x.c_str());
 

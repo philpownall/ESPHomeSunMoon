@@ -57,7 +57,7 @@ void day() {
     d = jd - J2000 ;
 }
 double moon_age_jd () {
-    double Agejdfraction = (jd - 2451550.0) / daysPerLunarMonth ;
+    double Agejdfraction = (jd - 2451550.1) / daysPerLunarMonth ;
     Agejdfraction = Agejdfraction - int(Agejdfraction);
     moonagejd = Agejdfraction * daysPerLunarMonth ;
     return moonagejd ;
