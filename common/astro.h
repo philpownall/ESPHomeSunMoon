@@ -50,8 +50,7 @@ void init(float my_utc_offset, float my_latitude, float my_longitude) {
     lw = ( - my_longitude * toRad ) ;  
 }
 void julian_day(double my_timestamp) {
-    double my_jd = ( my_timestamp / daySs ) - 0.5 + J1970 ;
-    jd = my_jd ;
+    jd = my_timestamp / daySs - 0.5 + J1970 ;
 }
 void day() {
     d = jd - J2000 ;
@@ -62,9 +61,13 @@ double moon_age_jd () {
     moonagejd = Agejdfraction * daysPerLunarMonth ;
     return moonagejd ;
 }
+double rev ( double x ) {
+    return  x - floor(x/360.0)*360.0;
+}
 double solarMeanAnomaly(double d) {
     // solarMeanAnomaly(d) { return rad * (357.5291 + 0.98560028 * d); }
-    sma =  toRad * (357.5291 + 0.98560028 * d);
+    double temp = rev(357.5291 + 0.98560028 * d);
+    sma =  toRad * temp;
     return sma ;
 }
 double eclipticLongitude(double sma) {
@@ -160,6 +163,16 @@ riseset_struct getRiseSet (float h0, double ra, double dec) {
     temp.rise = fmodf(constrain(rise)*24+utc_offset,24);
     temp.set = fmodf(constrain(set)*24+utc_offset,24);
     return temp;
+}
+std::string to_timestr (float my_time) {
+    int hrs = int(my_time);
+    std::string prefix_hrs;
+    if (hrs < 10) prefix_hrs="0"; else prefix_hrs="";
+    int mins = int((my_time - hrs)*60);
+    std::string prefix_mins;
+    if (mins < 10) prefix_mins="0"; else prefix_mins="";
+    std::string timestring = prefix_hrs + std::to_string(hrs) + ":" + prefix_mins + std::to_string(mins);
+    return timestring;
 }
 
 } // end namespace

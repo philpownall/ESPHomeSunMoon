@@ -29,8 +29,8 @@ script:
             Astro::siderealTime() ;
             ESP_LOGI("Astro", "... On %s",id(${entity_prefix}time).now().strftime("%Y-%m-%d").c_str());
             ESP_LOGI("Astro", "Timestamp %i seconds", int(myt) );
-            ESP_LOGI("Astro", "Astro Day %f days", Astro::d );
             ESP_LOGI("Astro", "Julian Day %f days", Astro::jd );
+            ESP_LOGI("Astro", "Astro Day %f days", Astro::d );
             ESP_LOGI("Astro", "Offset to UTC %f hours", utc_offset );
             ESP_LOGI("Astro", "User Location: Latitude %0.1f Longitude %0.1f", astro_latitude, astro_longitude );
       - number.set:
@@ -45,6 +45,7 @@ script:
       # 4. Set the sun declination(ecl,0) = asin(sin(0) * cos(e) + cos(0) * sin(e) * sin(ecl))
       - lambda: |-
             Astro::sun_coords = Astro::getCoords (Astro::eclipticLongitude (Astro::solarMeanAnomaly (Astro::d)),0);
+            ESP_LOGI("Astro", "sma %f° sunlon %f°", Astro::sma / id(my_rad), Astro::ecl / id(my_rad) );
             id(${entity_prefix}sun_ra).publish_state (Astro::sun_coords.ra / id(my_rad));
             id(${entity_prefix}sun_dec).publish_state (Astro::sun_coords.dec / id(my_rad));
       # 5. Set the sun azimuth(H, phi, dec) = atan2( sin(H),( cos(H) * sin(phi) - tan(dec) * cos(phi)) )
@@ -85,12 +86,18 @@ script:
       - text_sensor.template.publish:
           id: ${entity_prefix}moon_phase_name
           state: !lambda 'return Astro::moonphasetext(int(id(${entity_prefix}moonage).state));'
-      # 14. Sun Rise/Set, Moon Rise/Set
+      # 14. Sun Transit/Rise/Set, Moon Transit/Rise/Set
       - lambda: |-
           Astro::sun_riseset = Astro::getRiseSet (-0.8333, Astro::sun_coords.ra, Astro::sun_coords.dec);
-          ESP_LOGI("Astro", "Sun transit: %f rise: %f set: %f ", Astro::sun_riseset.transit, Astro::sun_riseset.rise, Astro::sun_riseset.set );
+          std::string transit_str = Astro::to_timestr(Astro::sun_riseset.transit) ;
+          std::string rise_str = Astro::to_timestr(Astro::sun_riseset.rise) ;
+          std::string set_str = Astro::to_timestr(Astro::sun_riseset.set) ;
+          ESP_LOGI("Astro", "Sun: transit %s rise %s set %s ", transit_str.c_str(), rise_str.c_str(), set_str.c_str() );
           Astro::moon_riseset = Astro::getRiseSet (0.125, Astro::moon_coords.ra, Astro::moon_coords.dec);
-          ESP_LOGI("Astro", "Moon transit: %f rise: %f set: %f ", Astro::moon_riseset.transit, Astro::moon_riseset.rise, Astro::moon_riseset.set );
+          transit_str = Astro::to_timestr(Astro::moon_riseset.transit) ;
+          rise_str = Astro::to_timestr(Astro::moon_riseset.rise) ;
+          set_str = Astro::to_timestr(Astro::moon_riseset.set) ;
+          ESP_LOGI("Astro", "Moon: transit %s rise %s set %s ", transit_str.c_str(), rise_str.c_str(), set_str.c_str() );
 
 time:
   - platform: host
@@ -104,8 +111,8 @@ number:
     name: Moon Age
     id: ${entity_prefix}moonage
     unit_of_measurement: "Days"
-    min_value: 0
-    max_value: 30
+    min_value: 0.0
+    max_value: 29.54
     step: 0.01
     optimistic: True
     internal: True
