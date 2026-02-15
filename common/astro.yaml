@@ -100,8 +100,13 @@ script:
           ESP_LOGI("Astro", "Moon: transit %s rise %s set %s ", transit_str.c_str(), rise_str.c_str(), set_str.c_str() );
 
 time:
-  - platform: host
+  - platform: sntp
     id: ${entity_prefix}time
+    timezone: ${my_timezone}
+    servers:
+      - 54.39.23.64
+      - 23.159.16.194
+      - 23.133.168.246
     on_time_sync:
       then:
         - logger.log: "Synchronized system clock"
