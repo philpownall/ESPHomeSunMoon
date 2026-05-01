@@ -103,13 +103,14 @@ time:
   - platform: sntp
     id: ${entity_prefix}time
     timezone: ${my_timezone}
-    servers:
-      - 54.39.23.64
-      - 23.159.16.194
-      - 23.133.168.246
+# use default ntp servers (don't use manual IP in WiFi!)
+#    servers:
+#      - 54.39.23.64
+#      - 23.159.16.194
+#      - 23.133.168.246
     on_time_sync:
       then:
-        - logger.log: "Synchronized system clock"
+        - logger.log: "Synchronized system clock using default sntp time server"
 
 number:
   - platform: template
