@@ -85,20 +85,20 @@ script:
             Astro::moon_illumination = Astro::moonillumination(Astro::moon_phase) ;
             return Astro::moon_illumination ;
       - sensor.template.publish: 
-          id: ${entity_prefix}moon_parallactic_angle
+          id: ${entity_prefix}moon_parallactic
           state: !lambda |-
-            Astro::moon_parallactic_angle = Astro::moonparallacticangle(Astro::phi, Astro::moon_coords.dec, Astro::moon_position.az) ;
-            return Astro::moon_parallactic_angle / id(my_rad);
+            Astro::moon_parallactic_angle = Astro::moonparallactic(Astro::phi, Astro::moon_coords.dec, Astro::moon_position.az) ;
+            return Astro::moon_parallactic / id(my_rad);
       - sensor.template.publish: 
-          id: ${entity_prefix}moon_brightlimb_angle
+          id: ${entity_prefix}moon_brightlimb
           state: !lambda |-
-            Astro::moon_brightlimb_angle = Astro::moonbrightlimbangle(Astro::sun_coords.dec, Astro::sun_coords.ra, Astro::moon_coords.dec, Astro::moon_coords.ra) ;
-            return Astro::moon_brightlimb_angle / id(my_rad);
+            Astro::moon_brightlimb = Astro::moonbrightlimb(Astro::sun_coords.dec, Astro::sun_coords.ra, Astro::moon_coords.dec, Astro::moon_coords.ra) ;
+            return Astro::moon_brightlimb / id(my_rad);
       - sensor.template.publish: 
-          id: ${entity_prefix}moon_rotation_angle
+          id: ${entity_prefix}moon_rotation
           state: !lambda |-
-            Astro::moon_rotation_angle = Astro::moonrotationangle(Astro::moonparallacticangle, Astro::moon_brightlimb_angle) ;
-            return Astro::moon_rotation_angle / id(my_rad);
+            Astro::moon_rotation = Astro::moonrotation(Astro::moonparallactic, Astro::moon_brightlimb) ;
+            return Astro::moon_rotation / id(my_rad);
       # 13. Set the moon phase name
       - text_sensor.template.publish:
           id: ${entity_prefix}moon_phase_name
@@ -150,6 +150,36 @@ sensor:
     on_value:
       - lambda: |-
           ESP_LOGI("Astro", "Moon Illumination %0.1f%%", x);
+
+  - platform: template
+    name: Moon Parallactic
+    id: ${entity_prefix}moon_parallactic
+    unit_of_measurement: "°"
+    internal: True
+    update_interval: never
+    on_value:
+      - lambda: |-
+          ESP_LOGI("Astro", "Moon Parallactic %0.1f°", x);
+
+  - platform: template
+    name: Moon Bright Limb
+    id: ${entity_prefix}moon_brightlimb
+    unit_of_measurement: "°"
+    internal: True
+    update_interval: never
+    on_value:
+      - lambda: |-
+          ESP_LOGI("Astro", "Moon Bright Limb %0.1f°", x);
+
+  - platform: template
+    name: Moon Rotation
+    id: ${entity_prefix}moon_rotation
+    unit_of_measurement: "°"
+    internal: True
+    update_interval: never
+    on_value:
+      - lambda: |-
+          ESP_LOGI("Astro", "Moon Rotation %0.1f°", x);
 
   - platform: template
     name: Moon Phase
