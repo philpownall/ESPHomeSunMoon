@@ -124,6 +124,19 @@ double moonillumination (double phase_angle) {
     double illumination = illumination_fraction * 100;
     return illumination;
 }
+double moonparallacticangle (double phi, double Dm, double Am) {
+    double pa = asin(sin(Am)*cos(phi)/cos(Dm));
+    return -pa;
+}
+double moonbrightlimbangle (double Ds, double RAs, double Dm, double RAm) {
+    double Num = cos(Ds) * sin(RAs - RAm);
+    double Denom = sin(Ds) * cos(Dm) - cos(Ds) * sin(Dm) * cos(RAs - RAm);
+    double BLA = atan(Num / Denom);
+    return BLA;
+}
+double moonrotationangle (double pa, double bla) {
+    return (bla - pa);
+}
 std::string moonphasetext (int age) {
     if (age < 2) { return "New Moon"; 
     } else if (age < 7) { return "Waxing Crescent";

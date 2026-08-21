@@ -17,6 +17,8 @@ script:
     then:
       # the astro_ functions are C++ functions defined in the includes: file astro.h 
       # astro_day sets the time for the other functions
+      # Note that all of the C functions are in radians
+      # and all of the Astro sensors are in degrees = radians / id(my_rad)
       - lambda: |-
             double myt = static_cast<double>(id(${entity_prefix}time).utcnow().timestamp);
             float my_hr = (id(${entity_prefix}time).now().hour);
@@ -82,6 +84,21 @@ script:
           state: !lambda |-
             Astro::moon_illumination = Astro::moonillumination(Astro::moon_phase) ;
             return Astro::moon_illumination ;
+      - sensor.template.publish: 
+          id: ${entity_prefix}moon_parallactic_angle
+          state: !lambda |-
+            Astro::moon_parallactic_angle = Astro::moonparallacticangle(Astro::phi, Astro::moon_coords.dec, Astro::moon_position.az) ;
+            return Astro::moon_parallactic_angle / id(my_rad);
+      - sensor.template.publish: 
+          id: ${entity_prefix}moon_brightlimb_angle
+          state: !lambda |-
+            Astro::moon_brightlimb_angle = Astro::moonbrightlimbangle(Astro::sun_coords.dec, Astro::sun_coords.ra, Astro::moon_coords.dec, Astro::moon_coords.ra) ;
+            return Astro::moon_brightlimb_angle / id(my_rad);
+      - sensor.template.publish: 
+          id: ${entity_prefix}moon_rotation_angle
+          state: !lambda |-
+            Astro::moon_rotation_angle = Astro::moonrotationangle(Astro::moonparallacticangle, Astro::moon_brightlimb_angle) ;
+            return Astro::moon_rotation_angle / id(my_rad);
       # 13. Set the moon phase name
       - text_sensor.template.publish:
           id: ${entity_prefix}moon_phase_name
