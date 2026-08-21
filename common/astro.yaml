@@ -87,7 +87,7 @@ script:
       - sensor.template.publish: 
           id: ${entity_prefix}moon_parallactic
           state: !lambda |-
-            Astro::moon_parallactic_angle = Astro::moonparallactic(Astro::phi, Astro::moon_coords.dec, Astro::moon_position.az) ;
+            Astro::moon_parallactic = Astro::moonparallactic(Astro::phi, Astro::moon_coords.dec, Astro::moon_position.az) ;
             return Astro::moon_parallactic / id(my_rad);
       - sensor.template.publish: 
           id: ${entity_prefix}moon_brightlimb
