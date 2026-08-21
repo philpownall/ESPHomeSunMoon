@@ -43,6 +43,9 @@ riseset_struct sun_riseset, moon_riseset ;
 // moon phase, illumination
 float moon_phase ;
 float moon_illumination ;
+double moon_parallactic ;
+double moon_brightlimb ;
+double moon_rotation ;
 
 void init(float my_utc_offset, float my_latitude, float my_longitude) {
     utc_offset = my_utc_offset ;
@@ -126,7 +129,7 @@ double moonillumination (double phase_angle) {
 }
 double moonparallactic (double phi, double Dm, double Am) {
     double pa = asin(sin(Am)*cos(phi)/cos(Dm));
-    return -pa;
+    return pa;
 }
 double moonbrightlimb (double Ds, double RAs, double Dm, double RAm) {
     double Num = cos(Ds) * sin(RAs - RAm);

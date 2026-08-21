@@ -97,7 +97,7 @@ script:
       - sensor.template.publish: 
           id: ${entity_prefix}moon_rotation
           state: !lambda |-
-            Astro::moon_rotation = Astro::moonrotation(Astro::moonparallactic, Astro::moon_brightlimb) ;
+            Astro::moon_rotation = Astro::moonrotation(Astro::moon_parallactic, Astro::moon_brightlimb) ;
             return Astro::moon_rotation / id(my_rad);
       # 13. Set the moon phase name
       - text_sensor.template.publish:
