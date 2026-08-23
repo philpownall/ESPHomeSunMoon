@@ -138,7 +138,9 @@ double moonbrightlimb (double Ds, double RAs, double Dm, double RAm) {
     return BLA;
 }
 double moonrotation (double pa, double bla) {
-    return (bla - pa);
+    double rotation = -(bla - pa - std::numbers::pi/2);
+    // if (rotation<0) rotation+=std::numbers::pi * 2;
+    return rotation;
 }
 std::string moonphasetext (int age) {
     if (age < 2) { return "New Moon"; 
