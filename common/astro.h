@@ -141,7 +141,7 @@ double moonrotation (double pa, double bla) {
     // This is the rotation angle of the moon with North pointing up
     // For the user's latitude
     // This is the view of the moon the user would see in the sky at his location
-    double rotation = -(bla - pa - std::numbers::pi/2);
+    double rotation = -(bla - pa) - std::numbers::pi/2;
     return rotation;
 }
 std::string moonphasetext (int age) {
